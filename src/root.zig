@@ -66,15 +66,15 @@ const builtin = @import("builtin");
 
 const platform = 
 if (builtin.os.tag == .linux)
-    @import("std")
+    @import("tz_linux.zig")
 else 
-    @import("builtin")
+    @compileError("Unsupported os")
 ;
 
 
 
 test "which import" {
-    _ = platform.os.environ.len;
+    _ = platform;
 }
 
 // /// Error types
