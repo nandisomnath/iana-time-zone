@@ -114,21 +114,26 @@ test "which import" {
 //     }
 // }
 
-// /// Get the current IANA time zone as a string.
-// ///
-// /// See the module-level documentation for a usage example and more details
-// /// about this function.
-// #[inline]
-// pub fn get_timezone() -> Result<String, GetTimezoneError> {
-//     platform::get_timezone_inner()
-// }
+const std = @import("std");
+
+/// Get the current IANA time zone as a string.
+///
+/// See the module-level documentation for a usage example and more details
+/// about this function.
+
+pub inline fn get_timezone(alloc: std.mem.Allocator) ![]const u8 {
+    return platform.get_timezone_inner(alloc);
+    // platform::get_timezone_inner()
+}
 
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
 
-//     #[test]
-//     fn get_current() {
-//         println!("current: {}", get_timezone().unwrap());
-//     }
+
+test "get_current" {
+    const timezone = try get_timezone(std.heap.page_allocator);
+    defer std.heap.page_allocator.free(timezone);
+    std.debug.print("current: {s}\n", .{timezone});
+}
 // }
