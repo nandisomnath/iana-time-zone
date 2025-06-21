@@ -28,6 +28,15 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // public module
+
+    _ = b.addModule("iana_time_zone", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize
+    });
+
+
     // Now, we will create a static library based on the module we created above.
     // This creates a `std.Build.Step.Compile`, which is the build step responsible
     // for actually invoking the compiler.
