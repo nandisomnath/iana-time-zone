@@ -1,139 +1,79 @@
-// #![warn(clippy::all)]
-// #![warn(clippy::cargo)]
-// #![warn(clippy::undocumented_unsafe_blocks)]
-// #![allow(unknown_lints)]
-// #![warn(missing_copy_implementations)]
-// #![warn(missing_debug_implementations)]
-// #![warn(missing_docs)]
-// #![warn(rust_2018_idioms)]
-// #![warn(trivial_casts, trivial_numeric_casts)]
-// #![warn(unused_qualifications)]
-// #![warn(variant_size_differences)]
-
 //! get the IANA time zone for the current system
 //!
-//! This small utility crate provides the
-//! [`get_timezone()`](fn.get_timezone.html) function.
+//! This small utility provides the [`get_timezone()`] function.
 //!
-//! ```rust
+//! ```zig
 //! // Get the current time zone as a string.
-//! let tz_str = iana_time_zone::get_timezone()?;
-//! println!("The current time zone is: {}", tz_str);
-//! # Ok::<(), iana_time_zone::GetTimezoneError>(())
+//! var tz = try iana_time_zone.get_timezone(std.heap.page_allocator);
+//! defer std.heap.page_allocator.free(tz);
+//! std.debug.print("The current time zone is: {s}\n", .{tz});
 //! ```
-//!
-//! The resulting string can be parsed to a
-//! [`chrono-tz::Tz`](https://docs.rs/chrono-tz/latest/chrono_tz/enum.Tz.html)
-//! variant like this:
-//! ```rust
-//! let tz_str = iana_time_zone::get_timezone()?;
-//! let tz: chrono_tz::Tz = tz_str.parse()?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-
-// #[allow(dead_code)]
-// mod ffi_utils;
-
-// #[cfg_attr(
-//     any(all(target_os = "linux", not(target_env = "ohos")), target_os = "hurd"),
-//     path = "tz_linux.rs"
-// )]
-// #[cfg_attr(all(target_os = "linux", target_env = "ohos"), path = "tz_ohos.rs")]
-// #[cfg_attr(target_os = "windows", path = "tz_windows.rs")]
-// #[cfg_attr(target_vendor = "apple", path = "tz_darwin.rs")]
-// #[cfg_attr(
-//     all(target_arch = "wasm32", target_os = "unknown"),
-//     path = "tz_wasm32_unknown.rs"
-// )]
-// #[cfg_attr(
-//     any(target_os = "freebsd", target_os = "dragonfly"),
-//     path = "tz_freebsd.rs"
-// )]
-// #[cfg_attr(
-//     any(target_os = "netbsd", target_os = "openbsd"),
-//     path = "tz_netbsd.rs"
-// )]
-// #[cfg_attr(
-//     any(target_os = "illumos", target_os = "solaris"),
-//     path = "tz_illumos.rs"
-// )]
-// #[cfg_attr(target_os = "aix", path = "tz_aix.rs")]
-// #[cfg_attr(target_os = "android", path = "tz_android.rs")]
-// #[cfg_attr(target_os = "haiku", path = "tz_haiku.rs")]
-// mod platform;
-
-const builtin = @import("builtin");
-
-const platform = 
-if (builtin.os.tag == .linux)
-    @import("tz_linux.zig")
-else 
-    @compileError("Unsupported os")
-;
-
-
-
-test "which import" {
-    _ = platform;
-}
-
-// /// Error types
-// #[derive(Debug)]
-// pub enum GetTimezoneError {
-//     /// Failed to parse
-//     FailedParsingString,
-//     /// Wrapped IO error
-//     IoError(std::io::Error),
-//     /// Platform-specific error from the operating system
-//     OsError,
-// }
-
-// impl std::error::Error for GetTimezoneError {
-//     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-//         match self {
-//             GetTimezoneError::FailedParsingString => None,
-//             GetTimezoneError::IoError(err) => Some(err),
-//             GetTimezoneError::OsError => None,
-//         }
-//     }
-// }
-
-// impl std::fmt::Display for GetTimezoneError {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-//         f.write_str(match self {
-//             GetTimezoneError::FailedParsingString => "GetTimezoneError::FailedParsingString",
-//             GetTimezoneError::IoError(err) => return err.fmt(f),
-//             GetTimezoneError::OsError => "OsError",
-//         })
-//     }
-// }
-
-// impl From<std::io::Error> for GetTimezoneError {
-//     fn from(orig: std::io::Error) -> Self {
-//         GetTimezoneError::IoError(orig)
-//     }
-// }
 
 const std = @import("std");
+const builtin = @import("builtin");
+
+// Error types for timezone retrieval
+pub const GetTimezoneError = error{
+    /// Unsupported operating system
+    UnsupportedOS,
+    /// Failed to read timezone from system
+    OsError,
+    /// Invalid timezone format
+    InvalidFormat,
+    /// IO error when reading files
+    IoError,
+};
+
+/// Platform-specific implementations
+const Platform = if (builtin.os.tag == .linux) struct {
+    pub const get_timezone_inner = @import("tz_linux.zig").get_timezone_inner;
+} else if (builtin.os.tag == .windows) struct {
+    pub const get_timezone_inner = @import("tz_windows.zig").get_timezone_inner;
+} else if (builtin.os.tag == .macos) struct {
+    pub const get_timezone_inner = @import("tz_darwin.zig").get_timezone_inner;
+} else if (builtin.os.tag == .freebsd) struct {
+    pub const get_timezone_inner = @import("tz_freebsd.zig").get_timezone_inner;
+} else if (builtin.os.tag == .netbsd) struct {
+    pub const get_timezone_inner = @import("tz_netbsd.zig").get_timezone_inner;
+} else if (builtin.os.tag == .illumos) struct {
+    pub const get_timezone_inner = @import("tz_illumos.zig").get_timezone_inner;
+} else if (builtin.os.tag == .aix) struct {
+    pub const get_timezone_inner = @import("tz_aix.zig").get_timezone_inner;
+} else if (builtin.os.tag == .haiku) struct {
+    pub const get_timezone_inner = @import("tz_haiku.zig").get_timezone_inner;
+} else struct {
+    pub fn get_timezone_inner(_: std.mem.Allocator) GetTimezoneError![]u8 {
+        @compileError("Unsupported operating system: " ++ @tagName(builtin.os.tag));
+    }
+};
 
 /// Get the current IANA time zone as a string.
 ///
-/// See the module-level documentation for a usage example and more details
-/// about this function.
-
-pub inline fn get_timezone(alloc: std.mem.Allocator) ![]const u8 {
-    return platform.get_timezone_inner(alloc);
-    // platform::get_timezone_inner()
+/// Returns the time zone name (e.g., "America/New_York", "Europe/London").
+/// The caller must free the returned string using the provided allocator.
+///
+/// # Arguments
+/// * `allocator` - The allocator to use for memory allocation
+///
+/// # Returns
+/// The IANA time zone name as a heap-allocated string, or an error
+pub fn get_timezone(allocator: std.mem.Allocator) GetTimezoneError![]u8 {
+    return Platform.get_timezone_inner(allocator);
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+/// Get the current IANA time zone as a static string slice (null-terminated).
+///
+/// This is a convenience function that uses the global page allocator.
+/// For production use, prefer `get_timezone()` with a specific allocator.
+///
+/// # Returns
+/// The IANA time zone name as a slice, or an error
+pub fn get_timezone_default() GetTimezoneError![]u8 {
+    return Platform.get_timezone_inner(std.heap.page_allocator);
+}
 
-
-test "get_current" {
-    const timezone = try get_timezone(std.heap.page_allocator);
+test "get_current_timezone" {
+    const timezone = try get_timezone_default();
     defer std.heap.page_allocator.free(timezone);
-    std.debug.print("current: {s}\n", .{timezone});
+    std.debug.print("Current timezone: {s}\n", .{timezone});
 }
-// }
